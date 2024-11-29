@@ -4,11 +4,28 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="81a7ee52-ce3c-4532-a39f-d76476ed406c" name="Changes" comment="Edit" />
+    <list default="true" id="81a7ee52-ce3c-4532-a39f-d76476ed406c" name="Changes" comment="Added Customized tool">
+      <change afterPath="$PROJECT_DIR$/AAA.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/LLM_Find/Handbooks/OpenStreetMap.toml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/LLM_Find/Keys/US_Census_demography.keys" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/LLM_Find/Keys/gggg.keys" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/LLM_Find/config.ini" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/LLM_Find/handbook.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/LLM_Find/handbook_example.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/LLM_Find/Handbooks/Handbooks_README.md" beforeDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
   </component>
   <component name="FlaskConsoleOptions" custom-start-script="import sys&#10;sys.path.extend([WORKING_DIR_AND_PYTHON_PATHS])&#10;from flask.cli import ScriptInfo&#10;locals().update(ScriptInfo(create_app=None).load_app().make_shell_context())&#10;print(&quot;Python %s on %s\nApp: %s [%s]\nInstance: %s&quot; % (sys.version, sys.platform, app.import_name, app.env, app.instance_path))">
     <envs>
@@ -55,10 +72,14 @@
   <component name="PropertiesComponent">{
   &quot;keyToString&quot;: {
     &quot;ASKED_ADD_EXTERNAL_FILES&quot;: &quot;true&quot;,
+    &quot;Python.AAA.executor&quot;: &quot;Run&quot;,
+    &quot;Python.LLM_FIND.executor&quot;: &quot;Run&quot;,
+    &quot;Python.handbook.executor&quot;: &quot;Run&quot;,
+    &quot;Python.ss.executor&quot;: &quot;Run&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/AKINBOYEWA TEMITOPE/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/AutonomousGIS_GeodataRetrieverAgent&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/AKINBOYEWA TEMITOPE/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/SpatialAnalysisAgent-master&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
     &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
@@ -68,7 +89,13 @@
   }
 }</component>
   <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\AKINBOYEWA TEMITOPE\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\AutonomousGIS_GeodataRetrieverAgent\LLM_Find\Keys" />
+      <recent name="C:\Users\AKINBOYEWA TEMITOPE\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\AutonomousGIS_GeodataRetrieverAgent\LLM_Find" />
+      <recent name="C:\Users\AKINBOYEWA TEMITOPE\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\AutonomousGIS_GeodataRetrieverAgent\LLM_Find\Handbooks" />
+    </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\AKINBOYEWA TEMITOPE\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\AutonomousGIS_GeodataRetrieverAgent\LLM_Find" />
       <recent name="D:\Onedrive\OneDrive - The Pennsylvania State University\LLMFIND\Plugin\AutonomousGIS_GeodataRetrieverAgent-master" />
     </key>
   </component>
@@ -238,110 +265,17 @@
       <workItem from="1727238610340" duration="1734000" />
       <workItem from="1727240372073" duration="1545000" />
       <workItem from="1727242286371" duration="335000" />
-    </task>
-    <task id="LOCAL-00047" summary="Updated User Manual">
-      <option name="closed" value="true" />
-      <created>1723108382713</created>
-      <option name="number" value="00047" />
-      <option name="presentableId" value="LOCAL-00047" />
-      <option name="project" value="LOCAL" />
-      <updated>1723108382713</updated>
-    </task>
-    <task id="LOCAL-00048" summary="Updated README.md">
-      <option name="closed" value="true" />
-      <created>1723397212837</created>
-      <option name="number" value="00048" />
-      <option name="presentableId" value="LOCAL-00048" />
-      <option name="project" value="LOCAL" />
-      <updated>1723397212837</updated>
-    </task>
-    <task id="LOCAL-00049" summary="Updated README.md">
-      <option name="closed" value="true" />
-      <created>1723397511992</created>
-      <option name="number" value="00049" />
-      <option name="presentableId" value="LOCAL-00049" />
-      <option name="project" value="LOCAL" />
-      <updated>1723397511992</updated>
-    </task>
-    <task id="LOCAL-00050" summary="Updated User_Manual">
-      <option name="closed" value="true" />
-      <created>1723400319241</created>
-      <option name="number" value="00050" />
-      <option name="presentableId" value="LOCAL-00050" />
-      <option name="project" value="LOCAL" />
-      <updated>1723400319241</updated>
-    </task>
-    <task id="LOCAL-00051" summary="Updated User_Manual">
-      <option name="closed" value="true" />
-      <created>1723638833815</created>
-      <option name="number" value="00051" />
-      <option name="presentableId" value="LOCAL-00051" />
-      <option name="project" value="LOCAL" />
-      <updated>1723638833815</updated>
-    </task>
-    <task id="LOCAL-00052" summary="Updated User_Manual">
-      <option name="closed" value="true" />
-      <created>1724195593516</created>
-      <option name="number" value="00052" />
-      <option name="presentableId" value="LOCAL-00052" />
-      <option name="project" value="LOCAL" />
-      <updated>1724195593516</updated>
-    </task>
-    <task id="LOCAL-00053" summary="Updated the settings panel of the GUI">
-      <option name="closed" value="true" />
-      <created>1724196069512</created>
-      <option name="number" value="00053" />
-      <option name="presentableId" value="LOCAL-00053" />
-      <option name="project" value="LOCAL" />
-      <updated>1724196069512</updated>
-    </task>
-    <task id="LOCAL-00054" summary="Updated the metadata.txt">
-      <option name="closed" value="true" />
-      <created>1724197532037</created>
-      <option name="number" value="00054" />
-      <option name="presentableId" value="LOCAL-00054" />
-      <option name="project" value="LOCAL" />
-      <updated>1724197532037</updated>
-    </task>
-    <task id="LOCAL-00055" summary="Updated the metadata.txt">
-      <option name="closed" value="true" />
-      <created>1724201299677</created>
-      <option name="number" value="00055" />
-      <option name="presentableId" value="LOCAL-00055" />
-      <option name="project" value="LOCAL" />
-      <updated>1724201299677</updated>
-    </task>
-    <task id="LOCAL-00056" summary="Updated the Help panel">
-      <option name="closed" value="true" />
-      <created>1724201319461</created>
-      <option name="number" value="00056" />
-      <option name="presentableId" value="LOCAL-00056" />
-      <option name="project" value="LOCAL" />
-      <updated>1724201319461</updated>
-    </task>
-    <task id="LOCAL-00057" summary="Updated the Help panel">
-      <option name="closed" value="true" />
-      <created>1724201999629</created>
-      <option name="number" value="00057" />
-      <option name="presentableId" value="LOCAL-00057" />
-      <option name="project" value="LOCAL" />
-      <updated>1724201999629</updated>
-    </task>
-    <task id="LOCAL-00058" summary="Updated the README.md">
-      <option name="closed" value="true" />
-      <created>1724203685767</created>
-      <option name="number" value="00058" />
-      <option name="presentableId" value="LOCAL-00058" />
-      <option name="project" value="LOCAL" />
-      <updated>1724203685767</updated>
-    </task>
-    <task id="LOCAL-00059" summary="Updated the User_manual.md">
-      <option name="closed" value="true" />
-      <created>1724203698322</created>
-      <option name="number" value="00059" />
-      <option name="presentableId" value="LOCAL-00059" />
-      <option name="project" value="LOCAL" />
-      <updated>1724203698322</updated>
+      <workItem from="1727242959721" duration="41306000" />
+      <workItem from="1727314725379" duration="346000" />
+      <workItem from="1727378041032" duration="2739000" />
+      <workItem from="1728287370780" duration="4919000" />
+      <workItem from="1728292903023" duration="4207000" />
+      <workItem from="1728871211340" duration="1386000" />
+      <workItem from="1729618981084" duration="1307000" />
+      <workItem from="1731711621478" duration="1568000" />
+      <workItem from="1731945411304" duration="6449000" />
+      <workItem from="1732210776347" duration="1935000" />
+      <workItem from="1732818658285" duration="1333000" />
     </task>
     <task id="LOCAL-00060" summary="Updated the Doc folder">
       <option name="closed" value="true" />
@@ -631,7 +565,111 @@
       <option name="project" value="LOCAL" />
       <updated>1727242564205</updated>
     </task>
-    <option name="localTasksCounter" value="96" />
+    <task id="LOCAL-00096" summary="Edit">
+      <option name="closed" value="true" />
+      <created>1727258423094</created>
+      <option name="number" value="00096" />
+      <option name="presentableId" value="LOCAL-00096" />
+      <option name="project" value="LOCAL" />
+      <updated>1727258423095</updated>
+    </task>
+    <task id="LOCAL-00097" summary="Added Customized tool">
+      <option name="closed" value="true" />
+      <created>1732885806095</created>
+      <option name="number" value="00097" />
+      <option name="presentableId" value="LOCAL-00097" />
+      <option name="project" value="LOCAL" />
+      <updated>1732885806095</updated>
+    </task>
+    <task id="LOCAL-00098" summary="Added Customized tool">
+      <option name="closed" value="true" />
+      <created>1732885819515</created>
+      <option name="number" value="00098" />
+      <option name="presentableId" value="LOCAL-00098" />
+      <option name="project" value="LOCAL" />
+      <updated>1732885819515</updated>
+    </task>
+    <task id="LOCAL-00099" summary="Added Customized tool">
+      <option name="closed" value="true" />
+      <created>1732885830642</created>
+      <option name="number" value="00099" />
+      <option name="presentableId" value="LOCAL-00099" />
+      <option name="project" value="LOCAL" />
+      <updated>1732885830643</updated>
+    </task>
+    <task id="LOCAL-00100" summary="Added Customized tool">
+      <option name="closed" value="true" />
+      <created>1732885846264</created>
+      <option name="number" value="00100" />
+      <option name="presentableId" value="LOCAL-00100" />
+      <option name="project" value="LOCAL" />
+      <updated>1732885846264</updated>
+    </task>
+    <task id="LOCAL-00101" summary="Added Customized tool">
+      <option name="closed" value="true" />
+      <created>1732885853462</created>
+      <option name="number" value="00101" />
+      <option name="presentableId" value="LOCAL-00101" />
+      <option name="project" value="LOCAL" />
+      <updated>1732885853462</updated>
+    </task>
+    <task id="LOCAL-00102" summary="Added Customized tool">
+      <option name="closed" value="true" />
+      <created>1732885867182</created>
+      <option name="number" value="00102" />
+      <option name="presentableId" value="LOCAL-00102" />
+      <option name="project" value="LOCAL" />
+      <updated>1732885867182</updated>
+    </task>
+    <task id="LOCAL-00103" summary="Added Customized tool">
+      <option name="closed" value="true" />
+      <created>1732885888069</created>
+      <option name="number" value="00103" />
+      <option name="presentableId" value="LOCAL-00103" />
+      <option name="project" value="LOCAL" />
+      <updated>1732885888069</updated>
+    </task>
+    <task id="LOCAL-00104" summary="Added Customized tool">
+      <option name="closed" value="true" />
+      <created>1732885938452</created>
+      <option name="number" value="00104" />
+      <option name="presentableId" value="LOCAL-00104" />
+      <option name="project" value="LOCAL" />
+      <updated>1732885938452</updated>
+    </task>
+    <task id="LOCAL-00105" summary="Added Customized tool">
+      <option name="closed" value="true" />
+      <created>1732885956186</created>
+      <option name="number" value="00105" />
+      <option name="presentableId" value="LOCAL-00105" />
+      <option name="project" value="LOCAL" />
+      <updated>1732885956187</updated>
+    </task>
+    <task id="LOCAL-00106" summary="Added Customized tool">
+      <option name="closed" value="true" />
+      <created>1732886022882</created>
+      <option name="number" value="00106" />
+      <option name="presentableId" value="LOCAL-00106" />
+      <option name="project" value="LOCAL" />
+      <updated>1732886022882</updated>
+    </task>
+    <task id="LOCAL-00107" summary="Added Customized tool">
+      <option name="closed" value="true" />
+      <created>1732886028940</created>
+      <option name="number" value="00107" />
+      <option name="presentableId" value="LOCAL-00107" />
+      <option name="project" value="LOCAL" />
+      <updated>1732886028940</updated>
+    </task>
+    <task id="LOCAL-00108" summary="Added Customized tool">
+      <option name="closed" value="true" />
+      <created>1732886039359</created>
+      <option name="number" value="00108" />
+      <option name="presentableId" value="LOCAL-00108" />
+      <option name="project" value="LOCAL" />
+      <updated>1732886039359</updated>
+    </task>
+    <option name="localTasksCounter" value="109" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -696,6 +734,24 @@
     <MESSAGE value="Updated the AGGRA_dockwidget.py" />
     <MESSAGE value="Few Update" />
     <MESSAGE value="Edit" />
-    <option name="LAST_COMMIT_MESSAGE" value="Edit" />
+    <MESSAGE value="Added Customized tool" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added Customized tool" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" log-message="true" suspend="NONE" type="python-line">
+          <url>file://$PROJECT_DIR$/AGGRA_dockwidget.py</url>
+          <line>59</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/AutonomousGIS_GeodataRetrieverAgent$handbook.coverage" NAME="handbook Coverage Results" MODIFIED="1728289000264" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/LLM_Find" />
+    <SUITE FILE_PATH="coverage/AutonomousGIS_GeodataRetrieverAgent$AAA.coverage" NAME="AAA Coverage Results" MODIFIED="1727304666989" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/AutonomousGIS_GeodataRetrieverAgent$ss.coverage" NAME="ss Coverage Results" MODIFIED="1727255812849" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/LLM_Find" />
+    <SUITE FILE_PATH="coverage/AutonomousGIS_GeodataRetrieverAgent$LLM_FIND.coverage" NAME="LLM_FIND Coverage Results" MODIFIED="1728289072345" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/LLM_Find" />
   </component>
 </project>
