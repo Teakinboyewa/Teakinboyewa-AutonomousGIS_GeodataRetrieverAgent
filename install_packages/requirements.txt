@@ -1,9 +1,8 @@
-openai
-pyvis
-langchain-openai
-nest-asyncio
-rasterio
-osmnx
-pyogrio
-fiona
-geopandas
+openai:openai
+pyvis:pyvis
+langchain_openai:langchain_openai
+nest_asyncio:nest_asyncio
+rasterio:rasterio
+osmnx:osmnx
+fiona:fiona
+geopandas:geopandas
