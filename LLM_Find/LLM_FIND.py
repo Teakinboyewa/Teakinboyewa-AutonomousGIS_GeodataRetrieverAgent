@@ -1,3 +1,4 @@
+#%% Import package
 import os
 import sys
 import asyncio
@@ -28,16 +29,19 @@ if ipython:
 
 
 # Get the directory of the current script
-current_script_dir = os.path.dirname(os.path.abspath(__file__))
-llm_find_dir = os.path.join(current_script_dir, 'LLM_Find')
-
+plugin_dir = os.path.dirname(os.path.abspath(__file__))
+llm_find_dir = os.path.join(plugin_dir, 'LLM_Find')
+if plugin_dir not in sys.path:
+    sys.path.append(plugin_dir)
 # Add the directory to sys.path
-if current_script_dir not in sys.path:
+if llm_find_dir not in sys.path:
     sys.path.append(llm_find_dir)
+
 
 # Now you can import the module
 import LLM_Find_Constants as constants
 import LLM_Find_helper as helper
+import handbook
 
 
 import numpy as np
@@ -49,6 +53,8 @@ from langchain_openai import ChatOpenAI
 
 # OpenAI_key = helper.load_OpenAI_key()
 
+
+#%%
 # ---- Data source 1:  OpenStreetMap  -----------------
 
 ## task_name ='Nigeria_cities'
@@ -206,7 +212,7 @@ from langchain_openai import ChatOpenAI
 
 #------------------------------## Data source 2:  US Census Bureau administrative boundary
 
-## task_name ='Census_SC_tract'
+# # task_name ='Census_SC_tract'
 # downloaded_file_name = r'Census_SC_tract.gpkg'
 # saved_fname = os.path.join(os.getcwd(), "Downloaded_Data", downloaded_file_name)
 # task = rf'''1. Download all census tract boundaries in South Carolina, USA.
@@ -557,9 +563,7 @@ from langchain_openai import ChatOpenAI
 # '''
 
 
-
-
-
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 def main(task, saved_fname, model_name):
     filename_only = os.path.basename(saved_fname)
     # Convert the data locations string back to a list if needed
@@ -569,7 +573,6 @@ def main(task, saved_fname, model_name):
     return filename_only
 
 
-
 if __name__ == "__main__":
 
     task = sys.argv[1]
@@ -577,8 +580,9 @@ if __name__ == "__main__":
     model_name = sys.argv[3]
     main(task, saved_fname, model_name)
 downloaded_file_name = main(task, saved_fname, model_name)
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-#%%
+#%% Fetching data
 #Create the model
 if os.path.exists(saved_fname):
     os.remove(saved_fname)
@@ -586,18 +590,21 @@ if os.path.exists(saved_fname):
 save_dir = os.path.join(os.getcwd(), "Downloaded_Data")
 os.makedirs(save_dir, exist_ok=True)
 
-# model_name = r'gpt-4o'
+
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# model_name = r'gpt-4o'  # TO BE ENTERED ON THE PLUGIN
 OpenAI_key = helper.load_OpenAI_key()
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 model = ChatOpenAI(api_key=OpenAI_key, model=model_name, temperature=1)
-#%%
+
+#%% SELECT THE DATA SOURCE
 #Select the data source
 source_select_prompt_str = helper.create_select_prompt(task=task)
-
 print(source_select_prompt_str)
-#%%
-#Pick up the data source handbook
-from IPython.display import clear_output
 
+#%% #PICK UP THE DATA SOURCE HANDBOOK
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+from IPython.display import clear_output
 async def fetch_chunks(model, source_select_prompt_str):
     chunks = []
     async for chunk in model.astream(source_select_prompt_str):
@@ -609,30 +616,52 @@ chunks = asyncio.run(fetch_chunks(model, source_select_prompt_str))
 
 clear_output(wait=True)
 # clear_output(wait=False)
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 LLM_reply_str = helper.convert_chunks_to_str(chunks=chunks)
 
 print("Select the data source: \n")
 print(LLM_reply_str)
-#%%
-#Generate the data fetching program
+
+
+#%% #GENERATE THE DATA FETCHING PROGRAM
+
 import ast
 select_source = ast.literal_eval(LLM_reply_str)
 
 selected_data_source = select_source['Selected data source']
-data_source_ID = constants.data_source_dict[selected_data_source]['ID']
+
+handbook_files = handbook.collect_handbook_files() # NEW CHANGE
+
+descriptions_str, data_source_dict = handbook.assemble_handbook_description(handbook_files)  # NEW CHANGE
+print(data_source_dict)
+data_source_ID = data_source_dict[selected_data_source]['ID'] # NEW CHANGE
+
+
+# data_source_ID = constants.data_source_dict[selected_data_source]['ID']
 
 print("selected_data_source:", selected_data_source)
 print("data_source_ID:", data_source_ID)
 
-handbook_list = constants.handbooks[f"{data_source_ID}"]
-handbook_str =  '\n'.join([f"{idx + 1}. {line}" for idx, line in enumerate(handbook_list)])
+# handbook_list = constants.handbooks[f"{data_source_ID}"]
+# handbook_str =  '\n'.join([f"{idx + 1}. {line}" for idx, line in enumerate(handbook_list)])
+
+handbook_str = handbook.collect_a_handbook(source_ID=data_source_ID)  # NEW CHANGE
+
+
 print()
 print(f"Handbook:\n{handbook_str}")
+
+
 #%%
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 download_prompt_str = helper.create_download_prompt(task,saved_fname, selected_data_source, handbook_str)
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 print(download_prompt_str)
+
+
 #%%
 from IPython.display import clear_output
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 async def fetch_download_str(model, download_prompt_str):
     chunks = []
     async for chunk in model.astream(download_prompt_str):
@@ -643,14 +672,18 @@ nest_asyncio.apply()
 chunks = asyncio.run(fetch_chunks(model, download_prompt_str))
 clear_output(wait=True)
 # clear_output(wait=False)
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
 LLM_reply_str = helper.convert_chunks_to_str(chunks=chunks)
 print(LLM_reply_str)
 
 #%%
 code = helper.extract_code_from_str(LLM_reply_str, task)
 display(Code(code, language='python'))
-#%%
-#Execute the generated program
+
+
+#%% #EXECUTE THE GENERATED PROGRAM
+
 code = code.replace('area({osm_id})->.searchArea;',
                     'relation({osm_id}); map_to_area->.searchArea;')  # GPT-4o never follow the related instruction!
 code = helper.execute_complete_program(code=code, try_cnt=10, task=task, model_name=model_name,
@@ -658,9 +691,11 @@ code = helper.execute_complete_program(code=code, try_cnt=10, task=task, model_n
 code = code.replace('area({osm_id})->.searchArea;',
                     'relation({osm_id}); map_to_area->.searchArea;')  # GPT-4o never follow the related instruction!
 display(Code(code, language='python'))
-#%%
 
 
+
+#%%# # Displaying the result in QGIS
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # Displaying the result in QGIS
 if saved_fname.endswith('.gpkg') or saved_fname.endswith('.csv') or saved_fname.endswith('.shp'):
     layer = QgsVectorLayer(saved_fname, f"{downloaded_file_name}", "ogr")
@@ -676,3 +711,6 @@ else:
 
 print("SAVED FNAME: ",saved_fname)
 # print("Layer path: ",layer_path)
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+

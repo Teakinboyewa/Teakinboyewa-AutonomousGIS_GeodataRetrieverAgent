@@ -29,45 +29,12 @@ import shutil
 import requests
 from qgis.PyQt import QtGui, QtWidgets, uic
 from qgis.PyQt.QtCore import pyqtSignal
-
-
-
-
 import os
 import sys
 from qgis.PyQt.QtCore import QSettings
-
-
-from .install_packages.check_packages import check
-
-API_EXIST = False
-try:
-    settings = QSettings()
-    packages_installed = settings.value('AGGRA/PackagesInstalled', False, type=bool)
-
-    if not packages_installed:
-
-
-        check(['openai', 'langchain-openai', 'pyvis', 'nest-asyncio', 'rasterio', 'osmnx', 'geopandas', 'pyogrio',
-               'fiona'])
-
-    API_EXIST = True
-finally:
-    pass
-
-#     import openai
-
-    # API_EXIST = True
-
-try:
-    import threading
-except:
-    pass
-
 import time
 import traceback
 from io import StringIO
-
 from qgis.PyQt.QtCore import Qt, QCoreApplication
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
@@ -81,7 +48,7 @@ from PyQt5.QtCore import QUrl, QThread, pyqtSignal, pyqtSlot, QSettings
 from PyQt5.QtGui import QTextCursor
 
 from PyQt5.QtWidgets import QGridLayout, QHBoxLayout, QWidget, QPushButton, QFileDialog, QMenu, QAction, QCompleter, \
-    QVBoxLayout, QLineEdit, QTableWidgetItem, QDialog, QLabel, QMessageBox, QInputDialog
+    QVBoxLayout, QLineEdit, QTableWidgetItem, QDialog, QLabel, QMessageBox, QInputDialog, QComboBox
 from qgis.gui import QgsPasswordLineEdit
 from qgis.PyQt.QtWebKitWidgets import QWebView
 
@@ -89,6 +56,51 @@ from qgis.PyQt.QtWebKitWidgets import QWebView
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'AGGRA_dockwidget_base.ui'))
 
+current_script_dir = os.path.dirname(os.path.abspath(__file__))
+keys_dir = os.path.join(current_script_dir, 'LLM_Find', 'Keys')
+from .install_packages.check_packages import check_and_install_libraries , check_missing_libraries, read_libraries_from_file, install_libraries
+
+
+class LibraryCheckThread(QThread):
+    finished_checking = pyqtSignal(list)
+
+    def __init__(self, filename):
+        QThread.__init__(self)
+        self.filename = filename
+
+    def run(self):
+        # Perform the library check in this thread
+        missing_packages = check_missing_libraries(read_libraries_from_file(self.filename))
+        self.finished_checking.emit(missing_packages)
+
+
+class VersionCheckThread(QThread):
+    version_check_completed = pyqtSignal(bool)  # Emits True if update is needed
+
+    def run(self):
+        needs_update = self.check_openai_version()
+        self.version_check_completed.emit(needs_update)
+
+    def check_openai_version(self):
+        try:
+            import pkg_resources
+            import requests
+
+            # Get the installed version
+            installed_version = pkg_resources.get_distribution("openai").version
+
+            # Get the latest version from PyPI
+            response = requests.get("https://pypi.org/pypi/openai/json", timeout=5)
+            latest_version = response.json()["info"]["version"]
+
+            # Compare versions
+            if installed_version != latest_version:
+                return True
+            else:
+                return False
+        except Exception as e:
+            print(f"Error checking openai version: {e}")
+            return False
 
 class AGGRADockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
@@ -105,7 +117,20 @@ class AGGRADockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         # #widgets-and-dialogs-with-auto-connect
         self.setupUi(self)
         # Set initial size of the plugin window
-        self.set_initial_size(800, 600)  # Width: 800, Height: 600
+        # self.set_initial_size(800, 600)  # Width: 800, Height: 600
+        required_packages = os.path.join(current_script_dir, 'install_packages', 'requirements.txt')
+
+        self.library_check_thread = LibraryCheckThread(required_packages)
+        self.library_check_thread.finished_checking.connect(self.handle_missing_libraries)
+        self.library_check_thread.start()  # Start the background thread
+
+        # Start the OpenAI version check thread
+        self.version_check_thread = VersionCheckThread()
+        self.version_check_thread.version_check_completed.connect(self.handle_version_check)
+        self.version_check_thread.start()
+
+        self.load_OpenAI_key()
+
         self.initUI()
 
         # Initialize conversation history
@@ -127,6 +152,8 @@ class AGGRADockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.saved_fname_completer.setCaseSensitivity(Qt.CaseInsensitive)
         self.saved_fnameLineEdit.setCompleter(self.saved_fname_completer)
 
+        self.ChatMode_checkbox.toggled.connect(self.toggle_saved_fnameLineEdit)
+
         self.tabWidget = self.findChild(QtWidgets.QTabWidget, 'tabWidget')
         self.tab_3_index = self.tabWidget.indexOf(self.tab_3)
 
@@ -134,12 +161,14 @@ class AGGRADockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.tabWidget.setCurrentIndex(0)
 
 
+
     def initUI(self):
         self.run_button = self.findChild(QPushButton, 'run_button')
 
-        self.run_button.clicked.connect(self.run_script)
+        # self.run_button.clicked.connect(self.run_script)
 
-        self.run_button.clicked.connect(lambda: self.append_message(self.task_LineEdit.toPlainText()))
+        self.run_button.clicked.connect(self.send_button_clicked)
+        # self.run_button.clicked.connect(lambda: self.append_message(self.task_LineEdit.toPlainText()))
 
         self.interrupt_button.clicked.connect(self.interrupt)
         # self.chatgpt_ans.setReadOnly(True)  # Make the text edit read-only (if desired)
@@ -147,7 +176,7 @@ class AGGRADockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         self.SelectDataPath_ToolBtn.clicked.connect(self.select_output_directory)
 
-        self.clear_chatgpt_ansBtn.clicked.connect(self.clear_chatgpt_ans)
+        self.clear_chatgpt_ansBtn.clicked.connect(self.clear_textboxes)
 
         self.interrupt_button.clicked.connect(self.stop_script)
 
@@ -164,6 +193,8 @@ class AGGRADockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         self.add_document_button.clicked.connect(self.add_documentation_file)
         # self.add_document_github_button.clicked.connect(self.open_upload_dialog)
         self.add_document_github_button.clicked.connect(self.show_contribution_dialog)
+        self.Add_new_key_btn.clicked.connect(self.show_add_key_dialog)
+        self.remove_keyfile_btn.clicked.connect(self.show_remove_key_dialog)
 
         # Initialize the row label counter
         self.row_label_counter = 0
@@ -171,7 +202,7 @@ class AGGRADockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         # self.load_api_keys()
         self.setup_initial_rows()  # Set up initial rows in the table
-        self.read_updated_config()
+        # self.read_updated_config()
 
 
     def show_contribution_dialog(self):
@@ -181,34 +212,148 @@ class AGGRADockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         self.contribution_dialog.exec_()
 
-    def setup_initial_rows(self):
-        initial_keys = ["OpenAI_key", "US_Census_key", "OpenWeather_key", "OpenTopography"]
-        for key in initial_keys:
-            self.add_row(key)
+
+    def handle_missing_libraries(self, missing_packages):
+        if missing_packages:
+            message = "The following Python packages are required to use the plugin:\n\n"
+            message += "\n".join(missing_packages)
+            message += "\n\nWould you like to install them now? After installation, please restart QGIS."
+
+            reply = QMessageBox.question(self, 'Missing Dependencies', message,
+                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                install_libraries(missing_packages)
+
+    def check_libraries_once(self):
+
+        """Check if libraries were already installed, otherwise run the check."""
+        settings = QSettings('YourOrganization', 'YourApplication')
+        libraries_checked = settings.value('libraries_checked', False, type=bool)
+
+        if not libraries_checked:
+            # First time: Libraries have not been checked
+            print("Checking and installing required libraries...")
+            from .install_packages.check_packages import check_and_install_libraries
+            # Call your existing method to check and install libraries
+            required_packages = os.path.join(os.path.dirname(__file__), 'install_packages', 'requirements.txt')
+            check_and_install_libraries(required_packages)
+
+            # Mark the libraries as checked and installed
+            settings.setValue('libraries_checked', True)
+        else:
+            # Libraries have already been checked
+            print("Libraries have already been checked and installed.")
+
+
+    def handle_version_check(self, needs_update):
+        if needs_update:
+            message = (
+                "A new version of the 'openai' package is available.\n"
+                "Would you like to update it now? This may require administrator privileges."
+            )
+            reply = QMessageBox.question(
+                self, 'Update Available', message,
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                self.update_openai_package()
+
+    def update_openai_package(self):
+        try:
+            import subprocess
+            import sys
+
+            # Run the pip install command to update the package
+            subprocess.check_call(['python3', "-m", "pip", "install", "--upgrade", "openai"])
+
+            QMessageBox.information(
+                self, 'Update Successful',
+                "The 'openai' package has been updated. Please restart the application."
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self, 'Update Failed',
+                f"Failed to update 'openai' package:\n{e}"
+            )
+
     def read_updated_config(self):
         current_script_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(current_script_dir, 'LLM_Find', 'config.ini')
-        # config_path = os.path.join(os.path.dirname(self.script_path), 'config.ini')
+        config_path = os.path.join(current_script_dir, 'LLM_Find', 'openai_key_config.ini')
+        # config_path = os.path.join(os.path.dirname(self.script_path), 'openai_key_config.ini')
         config = configparser.ConfigParser()
         config.read(config_path)
-        if 'API_Key' in config:
-            for row in range(self.tableWidget.rowCount()):
-                key_name = self.tableWidget.cellWidget(row, 0).currentText()
-                if key_name in config['API_Key']:
-                    api_key = config['API_Key'][key_name]
-                    self.tableWidget.cellWidget(row, 1).findChild(QgsPasswordLineEdit).setText(api_key)
-    def add_row(self, key_name = None):
+        OpenAI_key = config['API_Key']['OpenAI_key']
+        self.OpenAI_key_LineEdit.setText(OpenAI_key)
+
+    def update_openai_config_file(self):
+        current_script_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(current_script_dir, 'LLM_Find', 'openai_key_config.ini')
+        # Ensure the directory exists, if not, create it
+        config_dir = os.path.dirname(config_path)
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+
+        config = configparser.ConfigParser()
+
+        # Check if the config file exists
+        if os.path.exists(config_path):
+            # If the config file exists, read the existing content
+            config.read(config_path)
+
+        if 'API_Key' not in config:
+            config['API_Key'] = {}
+            # Retrieve the API key from the line edit
+        OpenAI_key= self.OpenAI_key_LineEdit.text().strip()
+        config['API_Key']['OpenAI_key'] = OpenAI_key
+
+        with open(config_path, 'w') as configfile:
+            config.write(configfile)
+
+        # # Update the QSettings (optional, if you want to store it there too)
+        settings = QSettings('YourOrganization', 'YourApplication')
+        settings.setValue('API_Key/OpenAI_key', OpenAI_key)
+
+
+    def load_OpenAI_key(self):
+        current_script_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(current_script_dir, 'LLM_Find', 'openai_key_config.ini')
+        config = configparser.ConfigParser()
+        if os.path.exists(config_path):
+            config.read(config_path)
+            if 'API_Key' in config and 'OpenAI_key' in config['API_Key']:
+                api_key = config['API_Key']['OpenAI_key']
+                self.OpenAI_key_LineEdit.setText(api_key)
+        else:
+            self.update_openai_config_file()
+
+
+
+    def setup_initial_rows(self, keys_directory=keys_dir):
+        # Get all .keys files from the 'Keys' directory
+        # script_dir = os.path.dirname(os.path.abspath(__file__))
+        # keys_directory = 'Keys'  # Adjust the directory path as needed
+        keys_files = [f for f in os.listdir(keys_directory) if f.endswith('.keys') and f != 'template.keys']
+
+        # Strip the .keys extension for display purposes
+        initial_keys = [os.path.splitext(f)[0] for f in keys_files]
+
+        # Add a row for each key file found
+        for key in initial_keys:
+            self.add_row(key_name=key, keys_directory=keys_directory)
+
+        # initial_keys = ["OpenAI_key", "US_Census_key", "OpenWeather_key", "OpenTopography"]
+        # for key in initial_keys:
+        #     self.add_row(key)
+
+    def add_row(self, key_name = None, keys_directory=keys_dir):
         # Get the current number of rows
         row_count = self.tableWidget.rowCount()
         # Insert a new row at the end
         self.tableWidget.insertRow(row_count)
 
-
-
         # Create a QWidget container for the QgsPasswordLineEdit
         container_widget = QtWidgets.QWidget()
         password_edit = QgsPasswordLineEdit(container_widget)
-
 
         # Set the layout for the container widget
         layout = QtWidgets.QHBoxLayout(container_widget)
@@ -217,8 +362,26 @@ class AGGRADockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         # Create a QComboBox for the first column
         combo_box = QtWidgets.QComboBox()
-        names = ["OpenAI_key", "OpenWeather_key", "US_Census_key", "OpenTopography"]  # Replace with your list of names
-        combo_box.addItems(names)
+
+        # Add a blank option first
+        combo_box.addItem("")  # Blank option at the top
+
+        # Get the list of key names from the 'Keys' directory, excluding 'template.keys'
+        # Get the list of key names from the 'Keys' directory, excluding 'template.keys'
+        if keys_directory:
+            keys_files = [f for f in os.listdir(keys_directory) if f.endswith('.keys') and f != 'template.keys']
+            all_key_names = [os.path.splitext(f)[0] for f in keys_files]
+
+            # Add the key name options from the files as drop-down options
+            combo_box.addItems(all_key_names)
+            # names = ["OpenAI_key", "OpenWeather_key", "US_Census_key", "OpenTopography"]  # Replace with your list of names
+            # combo_box.addItems(names)
+
+            # Connect the combo box change signal to a function that sets the corresponding API key
+        combo_box.currentIndexChanged.connect(lambda: self.set_api_key(combo_box, password_edit, keys_directory))
+
+        # Connect the password field change signal to update the .keys file when edited
+        password_edit.textChanged.connect(lambda: self.update_datasources_api_key_file(combo_box, password_edit, keys_directory))
 
         if key_name:
             combo_box.setCurrentText(key_name)
@@ -226,10 +389,25 @@ class AGGRADockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
 
         # Set the API key if provided
-        if key_name:
-            settings = QSettings('YourOrganization', 'YourApplication')
-            api_key = settings.value(f'API_Key/{key_name}', '')
-            password_edit.setText(api_key)
+        # if key_name:
+        #     settings = QSettings('YourOrganization', 'YourApplication')
+        #     api_key = settings.value(f'API_Key/{key_name}', '')
+        #     password_edit.setText(api_key)
+
+        # Load the API key from the corresponding file
+        if key_name and keys_directory:
+            self.set_api_key(combo_box, password_edit, keys_directory)
+            # key_file_path = os.path.join(keys_directory, f"{key_name}.keys")
+            # try:
+            #     with open(key_file_path, 'r') as key_file:
+            #         # Assuming the key file contains a line like: OpenAI_key = <actual_api_key>
+            #         for line in key_file:
+            #             if "=" in line:
+            #                 key_value = line.split('=')[1].strip()
+            #                 password_edit.setText(key_value)  # Set the API key in the password field
+            #                 break  # We only expect one line containing the key
+            # except FileNotFoundError:
+            #     QMessageBox.warning(self, "File Error", f"File not found: {key_file_path}")
 
         # Create a QLineEdit for the second column
         # password_edit = QgsPasswordLineEdit
@@ -238,45 +416,218 @@ class AGGRADockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
         # Increment the row label counter
         self.row_label_counter += 1
-        # Adjust the table height
-        self.adjust_table_height()
+        # # Adjust the table height
+        # self.adjust_table_height()
+
+    def set_api_key(self, combo_box, password_edit, keys_directory):
+        # Get the selected key name from the combo box
+        selected_key_name = combo_box.currentText()
+
+        if selected_key_name:
+            # Construct the path to the corresponding .keys file
+            key_file_path = os.path.join(keys_directory, f"{selected_key_name}.keys")
+
+            try:
+                # Open the file and read the API key
+                with open(key_file_path, 'r') as key_file:
+                    for line in key_file:
+                        if "=" in line:
+                            key_value = line.split('=')[1].strip()
+                            password_edit.setText(key_value)  # Set the API key in the password field
+                            break  # Only expecting one key per file
+            except FileNotFoundError:
+                QMessageBox.warning(self, "File Error", f"File not found: {key_file_path}")
+        else:
+            # Clear the API key field if no valid key is selected
+            password_edit.clear()
+
+    def update_datasources_api_key_file(self, combo_box, password_edit, keys_directory):
+        # Get the selected key name from the combo box
+        selected_key_name = combo_box.currentText()
+
+        # Ensure a key name is selected
+        if selected_key_name:
+            # Construct the path to the corresponding .keys file
+            key_file_path = os.path.join(keys_directory, f"{selected_key_name}.keys")
+            API_keyname = f"{selected_key_name}_key"
+
+            # Get the new API key from the password edit field
+            new_api_key = password_edit.text()
+
+            try:
+                # Read the file content
+                with open(key_file_path, 'r') as key_file:
+                    lines = key_file.readlines()
+
+                # Find the line with the API key and update only that line
+                with open(key_file_path, 'w') as key_file:
+                    for line in lines:
+                        if line.startswith(f"{API_keyname} ="):
+                            # Replace the old key with the new key
+                            key_file.write(f"{API_keyname} = {new_api_key}\n")
+                        else:
+                            # Write the line back as it is if it's not the key line
+                            key_file.write(line)
+
+            except Exception as e:
+                QMessageBox.warning(self, "File Error",
+                                    f"Failed to update the key file: {key_file_path}\nError: {str(e)}")
+
+    def show_add_key_dialog(self):
+        # Create and display the dialog
+        keys_directory = keys_dir  # Adjust this path as needed
+        dialog = AddKeyDialog(keys_directory, self)
+
+        if dialog.exec_():  # If the dialog is successfully accepted (after pressing save)
+            # Get the new key name (the user input from the dialog)
+            new_key_name = dialog.name_input.text().strip()
+
+            # Add the new key name to the existing combo boxes
+            self.add_new_keyname_to_combo_boxes(new_key_name)
+
+    def add_new_keyname_to_combo_boxes(self, new_key_name):
+        # Iterate over the rows in your table and update the QComboBox for each row
+        for row in range(self.tableWidget.rowCount()):
+            combo_box = self.tableWidget.cellWidget(row, 0)  # Get the combo box in the first column of each row
+            if isinstance(combo_box, QtWidgets.QComboBox):
+                # Check if the new key is already in the combo box
+                if new_key_name not in [combo_box.itemText(i) for i in range(combo_box.count())]:
+                    # Add the new key to the combo box
+                    combo_box.addItem(new_key_name)
+
+        # After the dialog closes, refresh your table or UI to show the new key
+        # self.refresh_key_table()  # Assuming you have a method to refresh your table
+
+    # Function to show the remove key dialog and handle UI updates
+    def show_remove_key_dialog(self):
+        keys_directory = keys_dir  # Adjust the path as needed
+        dialog = RemoveKeyDialog(keys_directory, self)
+
+        if dialog.exec_():  # If the dialog is accepted (key successfully removed)
+            # Get the removed key name from the combo box
+            removed_key_name = dialog.combo_box.currentText()
+
+            # Remove the key from the combo boxes
+            self.remove_key_from_combo_boxes(removed_key_name)
+
+    def remove_key_from_combo_boxes(self, removed_key_name):
+        # First, iterate over the rows and remove the row where the key is selected
+        for row in reversed(range(self.tableWidget.rowCount())):  # Reverse to avoid index issues when removing rows
+            combo_box = self.tableWidget.cellWidget(row, 0)  # Get the combo box in the first column of each row
+            if isinstance(combo_box, QtWidgets.QComboBox):
+                # Check if the key is currently selected in this row
+                if combo_box.currentText() == removed_key_name:
+                    # Remove the entire row
+                    self.tableWidget.removeRow(row)
+
+        # Iterate over the rows in your table and update the QComboBox for each row
+        for row in range(self.tableWidget.rowCount()):
+            combo_box = self.tableWidget.cellWidget(row, 0)  # Get the combo box in the first column of each row
+            if isinstance(combo_box, QtWidgets.QComboBox):
+                # Find the index of the removed key in the combo box
+                index = combo_box.findText(removed_key_name)
+                if index != -1:
+                    # Remove the key from the combo box if it exists
+                    combo_box.removeItem(index)
+
+
+        # # Get the selected key name from the combo box
+        # selected_key_name = combo_box.currentText()
+        #
+        # if selected_key_name:
+        #     # Construct the path to the corresponding .keys file
+        #     key_file_path = os.path.join(keys_directory, f"{selected_key_name}.keys")
+        #
+        #     # Get the new API key from the password edit field
+        #     new_api_key = password_edit.text()
+        #
+        #     # Update the .keys file with the new API key
+        #     try:
+        #         with open(key_file_path, 'w') as key_file:
+        #             # Write the new API key in the format: key_name = new_api_key
+        #             key_file.write(f"{selected_key_name} = {new_api_key}")
+        #     except Exception as e:
+        #         QMessageBox.warning(self, "File Error",
+        #                             f"Failed to update the key file: {key_file_path}\nError: {str(e)}")
+
+        #
+        # self.api_keys = {}
+        # settings = QSettings('YourOrganization', 'YourApplication')
+        # for row in range(self.tableWidget.rowCount()):
+        #     key_name = self.tableWidget.cellWidget(row, 0).currentText()
+        #     api_key = self.tableWidget.cellWidget(row, 1).findChild(QgsPasswordLineEdit).text()
+        #     self.api_keys[key_name] = api_key
+        #     settings.setValue(f'API_Key/{key_name}', api_key)
+
+    # def load_api_keys(self):
+    #     settings = QSettings('YourOrganization', 'YourApplication')
+    #     for row in range(self.tableWidget.rowCount()):
+    #         key_name = self.tableWidget.cellWidget(row, 0).currentText()
+    #         api_key = settings.value(f'API_Key/{key_name}', '')
+    #         self.tableWidget.cellWidget(row, 1).findChild(QgsPasswordLineEdit).setText(api_key)
 
     def remove_row(self):
         # Get the selected row
         selected_row = self.tableWidget.currentRow()
         if selected_row >= 0:  # Ensure a row is selected
             self.tableWidget.removeRow(selected_row)
-            # Adjust the table height
-            self.adjust_table_height()
+            # # Adjust the table height
+            # self.adjust_table_height()
 
 
 
-    def adjust_table_height(self):
-        total_height = self.tableWidget.horizontalHeader().height()
-        for row in range(self.tableWidget.rowCount()):
-            total_height += self.tableWidget.rowHeight(row)
-        self.tableWidget.setFixedHeight(total_height)
+    # def adjust_table_height(self):
+    #     total_height = self.tableWidget.horizontalHeader().height()
+    #     for row in range(self.tableWidget.rowCount()):
+    #         total_height += self.tableWidget.rowHeight(row)
+    #     self.tableWidget.setFixedHeight(total_height)
 
-    def update_api_keys(self):
-        self.api_keys = {}
-        settings = QSettings('YourOrganization', 'YourApplication')
-        for row in range(self.tableWidget.rowCount()):
-            key_name = self.tableWidget.cellWidget(row, 0).currentText()
-            api_key = self.tableWidget.cellWidget(row, 1).findChild(QgsPasswordLineEdit).text()
-            self.api_keys[key_name] = api_key
-            settings.setValue(f'API_Key/{key_name}', api_key)
 
-    def load_api_keys(self):
-        settings = QSettings('YourOrganization', 'YourApplication')
-        for row in range(self.tableWidget.rowCount()):
-            key_name = self.tableWidget.cellWidget(row, 0).currentText()
-            api_key = settings.value(f'API_Key/{key_name}', '')
-            self.tableWidget.cellWidget(row, 1).findChild(QgsPasswordLineEdit).setText(api_key)
 
-    def set_initial_size(self, width, height):
-        """Set the initial size of the plugin window."""
-        self.resize(width, height)
+    # def set_initial_size(self, width, height):
+    #     """Set the initial size of the plugin window."""
+    #     self.resize(width, height)
 
+    def send_button_clicked(self):
+        """Slot to handle the send button click."""
+        user_message = self.task_LineEdit.toPlainText().strip()
+
+        if not user_message:
+            self.update_chatgpt_ans(f"AI: Please enter a data request in the request field.", is_user=False)
+            return  # Stop further execution if the task is empty
+
+        self.append_message(user_message)
+
+        # Call update_config_file to save the latest API key
+        self.update_openai_config_file()
+
+        # Now read the updated config file to refresh the API key
+        self.read_updated_config()
+
+        if not self.ChatMode_checkbox.isChecked() and self.saved_fnameLineEdit.isEnabled() and not self.saved_fnameLineEdit.text().strip():
+            self.update_chatgpt_ans(f"AI: Please specify the output directory.", is_user=False)
+            return  # Stop further execution if data path is required but empty
+
+        if self.ChatMode_checkbox.isChecked():  # Assuming SwitchControl behaves like a checkbox
+            self.chatgpt_direct_answer(user_message)
+
+        else:
+            self.run_script()
+
+
+    def chatgpt_direct_answer(self, user_message):
+        """Method to interact with GPT-4 and display the result in output_text_edit_2."""
+        # Retrieve the API key from the config
+        self.OpenAI_key = self.get_openai_key()  # This retrieves the latest key from the config
+        self.model_name = self.modelNameComboBox.currentText()
+
+        self.gpt_thread = GPTRequestThread(user_message, self.OpenAI_key, self.model_name,
+                                           self.conversation_history)  # your-api-key-here
+        # self.gpt_thread = GPTRequestThread(user_message, "AAzz", self.conversation_history)#your-api-key-here
+        self.gpt_thread.output_line.connect(self.update_output)
+        self.gpt_thread.finished_signal.connect(lambda: self.update_chatgpt_ans("AI: Done", is_user=False))
+
+        self.gpt_thread.start()
 
     def closeEvent(self, event):
         self.closingPlugin.emit()
@@ -370,13 +721,17 @@ class AGGRADockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.saved_fnameLineEdit.setText(f"{saved_fname}")
 
     def run_script(self):
-        self.update_api_keys()
-        self.tabWidget.setCurrentIndex(self.tab_3_index)
+        # self.update_api_keys()
+        # self.tabWidget.setCurrentIndex(self.tab_3_index)
+
         current_script_dir = os.path.dirname(os.path.abspath(__file__))
         script_path = os.path.join(current_script_dir, 'LLM_Find', 'LLM_FIND.py')
         # OpenAI_key = helper.load_OpenAI_key()
-        # self.OpenAI_key = self.get_openai_key()  # Retrieve the API key from the line edit
-        self.OpenAI_key = self.api_keys.get("OpenAI_key")
+        self.OpenAI_key = self.get_openai_key()  # Retrieve the API key from the line edit
+        # self.OpenAI_key = self.api_keys.get("OpenAI_key")
+        if not self.OpenAI_key:
+            self.update_chatgpt_ans(f"AI: Please enter a valid OpenAI API key.", is_user=False)
+            return
         self.model_name = self.modelNameComboBox.currentText()
 
         # self.task = self.task_LineEdit.text()
@@ -411,19 +766,28 @@ class AGGRADockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.saved_fname_completer.model().setStringList(self.saved_fname_history)
 
         self.thread.output_line.connect(self.update_output)
-        # self.thread.graph_ready.connect(self.update_graph)
-        # self.thread.graph_ready.connect(self.update_chatgpt_ans)
-        # self.thread.GraphReady.connect(self.update_chatgpt_ans)
         self.thread.chatgpt_update.connect(self.update_chatgpt_ans)
         self.thread.finished.connect(self.thread_finished)
         self.thread.start()
 
+        # Disable the send_button
+        self.run_button.setEnabled(False)
+        self.clear_chatgpt_ansBtn.setEnabled(False)
+        self.task_LineEdit.setEnabled(False)
+        self.saved_fnameLineEdit.setEnabled(False)
+        self.SelectDataPath_ToolBtn.setEnabled(False)
+
     def stop_script(self):
         if self.thread:
             self.thread.terminate()
-            self.update_chatgpt_ans(f"LLMQGIS: Script terminated")
+            self.update_chatgpt_ans(f"AI: Script terminated")
 
             # print("Script terminated")
+        self.run_button.setEnabled(True)
+        self.clear_chatgpt_ansBtn.setEnabled(True)
+        self.task_LineEdit.setEnabled(True)
+        self.saved_fnameLineEdit.setEnabled(True)
+        self.SelectDataPath_ToolBtn.setEnabled(True)
 
     def update_chatgpt_ans(self, message, is_user=False):
         # Append new message to conversation history
@@ -478,15 +842,34 @@ class AGGRADockWidget(QtWidgets.QDockWidget, FORM_CLASS):
             self.output_text_edit.insertPlainText("The script finished with errors.")
             self.update_chatgpt_ans(f"LLMFIND: The script finished with errors.")
 
-    def clear_chatgpt_ans(self):
-        self.output_text_edit.clear()
+        # Re-enable the send_button    #Not working
+        self.run_button.setEnabled(True)
+        self.clear_chatgpt_ansBtn.setEnabled(True)
+        self.task_LineEdit.setEnabled(True)
+        self.saved_fnameLineEdit.setEnabled(True)
+        self.SelectDataPath_ToolBtn.setEnabled(True)
 
+    def clear_textboxes(self):
+        self.output_text_edit.clear()
+        self.task_LineEdit.clear()
+        self.chatgpt_ans.clear()
+        # self.output_text_edit_2.clear()
+        # Clear conversation history to ensure no previous responses are carried forward
+        self.conversation_history = []
+
+    def toggle_saved_fnameLineEdit(self, checked):
+        """Enable or disable data_pathLineEdit based on the switch_control state."""
+        self.saved_fnameLineEdit.setEnabled(not checked)
+        self.SelectDataPath_ToolBtn.setEnabled(not checked)
     def interrupt(self):
         if self.thread:
             self.thread.stop()  # Call the stop method to set the flag
 
-    def get_api_key(self, key_name):
-        return self.self.api_keys.get(key_name)
+    def get_openai_key(self):
+        api_key = self.OpenAI_key_LineEdit.text()
+        if not api_key:
+            raise ValueError("API key is empty. Please enter a valid OpenAI API key.")
+        return api_key
 
 
     def add_documentation_file(self):
@@ -530,12 +913,12 @@ class ScriptThread(QThread):
     # GraphReady = pyqtSignal(str)
     finished = pyqtSignal(bool)
 
-    def __init__(self, script_path, task, saved_fname, api_keys, model_name):
+    def __init__(self, script_path, task, saved_fname, OpenAI_key, model_name):
         super().__init__()
         self.script_path = script_path
         self.task = task
         self.saved_fname = saved_fname
-        self.api_keys = api_keys  # Store the api_keys dictionary
+        self.OpenAI_key = OpenAI_key
         self.model_name = model_name
 
     def run(self):
@@ -543,19 +926,22 @@ class ScriptThread(QThread):
 
         try:
             # Update the config file with the API keys
-            self.update_config_file()
+            # self.update_config_file()
 
             # #Re-read the config to ensure the keys are updated
             # self.read_updated_config()
+
+            # Ensure that the updated configuration is read by reloading the config
+            config_path = os.path.join(os.path.dirname(self.script_path), 'LLM_Find', 'openai_key_config.ini')
+            config = configparser.ConfigParser()
+            config.read(config_path)
 
             # Read the script content
             with open(self.script_path, "r") as script_file:
                 script_content = script_file.read()
 
-            # Ensure that the updated configuration is read by reloading the config
-            config_path = os.path.join(os.path.dirname(self.script_path), 'LLM_Find', 'config.ini')
-            config = configparser.ConfigParser()
-            config.read(config_path)
+
+
 
             local_vars = {
                 'task': self.task,
@@ -592,6 +978,14 @@ class ScriptThread(QThread):
                         else:
                             # handle the case where the line doesn't end with a newline
                             self.output_line.emit(line)
+
+
+                        if "selected_data_source:" in line:
+                            tool_IDs = line.split("selected_data_source:")[1].strip()
+                            if tool_IDs:
+                                # self.tool_filename_ready.emit(tool_filename)  # Emit the tool filename
+                                # self.chatgpt_update.emit(f"AI: Selected tool(s): {tool_filename}")
+                                self.chatgpt_update.emit(f"AI: Selected data source: {tool_IDs}")
 
                 if captured_stderr:
                     for line in captured_stderr.splitlines(keepends=True):
@@ -640,26 +1034,26 @@ class ScriptThread(QThread):
             self.chatgpt_update.emit(f"Error: {e}\n{traceback_str}")  # Emit any exceptions)
             self.finished.emit(False)  # Signal failure
 
-    def update_config_file(self):
-        current_script_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(current_script_dir, 'LLM_Find', 'config.ini')
-        # config_path = os.path.join(os.path.dirname(self.script_path), 'config.ini')
-        config = configparser.ConfigParser()
-        config.read(config_path)
-
-        if 'API_Key' not in config:
-            config['API_Key'] = {}
-
-        for key_name, api_key in self.api_keys.items():
-            config['API_Key'][key_name] = api_key
-
-        with open(config_path, 'w') as configfile:
-            config.write(configfile)
+    # def update_config_file(self):
+    #     current_script_dir = os.path.dirname(os.path.abspath(__file__))
+    #     config_path = os.path.join(current_script_dir, 'LLM_Find', 'openai_key_config.ini')
+    #     # config_path = os.path.join(os.path.dirname(self.script_path), 'openai_key_config.ini')
+    #     config = configparser.ConfigParser()
+    #     config.read(config_path)
+    #
+    #     if 'API_Key' not in config:
+    #         config['API_Key'] = {}
+    #
+    #     for key_name, api_key in self.api_keys.items():
+    #         config['API_Key'][key_name] = api_key
+    #
+    #     with open(config_path, 'w') as configfile:
+    #         config.write(configfile)
 
     # def read_updated_config(self):
     #     current_script_dir = os.path.dirname(os.path.abspath(__file__))
-    #     config_path = os.path.join(current_script_dir, 'LLM_Find', 'config.ini')
-    #     # config_path = os.path.join(os.path.dirname(self.script_path), 'config.ini')
+    #     config_path = os.path.join(current_script_dir, 'LLM_Find', 'openai_key_config.ini')
+    #     # config_path = os.path.join(os.path.dirname(self.script_path), 'openai_key_config.ini')
     #     config = configparser.ConfigParser()
     #     config.read(config_path)
     #     if 'API_Key' in config:
@@ -669,12 +1063,57 @@ class ScriptThread(QThread):
     #                 api_key = config['API_Key'][key_name]
     #                 self.tableWidget.cellWidget(row, 1).findChild(QgsPasswordLineEdit).setText(api_key)
 
+
+
     def stop(self):
         self._is_running = False
 
     def isRunning(self):
         return self._is_running
 
+
+
+
+class GPTRequestThread(QThread):
+    output_line = pyqtSignal(str)
+    finished_signal = pyqtSignal()
+
+    def __init__(self, prompt, OpenAI_key, model_name, conversation_history):
+        super().__init__()
+        self.prompt = prompt
+        self.OpenAI_key = OpenAI_key
+        self.model_name = model_name
+
+    def load_api_key_from_config(self):
+        """Load OpenAI API key from openai_key_config.ini."""
+        current_script_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(current_script_dir, 'LLM_Find', 'openai_key_config.ini')
+
+        config = configparser.ConfigParser()
+        config.read(config_path)
+
+        if 'API_Key' in config and 'OpenAI_key' in config['API_Key']:
+            return config['API_Key']['OpenAI_key']
+        else:
+            raise ValueError("API Key not found in config file.")
+
+    def run(self):
+        try:
+            # self.update_config_file()
+            from openai import OpenAI
+            client = OpenAI(api_key=self.OpenAI_key)
+            response = client.chat.completions.create(
+                model= self.model_name,#"gpt-4",
+                messages=[
+                    {"role": "user", "content": self.prompt},
+                ]
+            )
+            reply = response.choices[0].message.content.strip()
+            self.output_line.emit(f"AI: {reply}")
+        except Exception as e:
+            self.output_line.emit(f"Error: {str(e)}")
+        finally:
+            self.finished_signal.emit()
 
 class ContributionDialog(QDialog):
     def __init__(self, parent=None):
@@ -866,3 +1305,118 @@ class ContributionDialog(QDialog):
                 self.prompt_pull_request(username)
             else:
                 QMessageBox.warning(self, "Error", "GitHub username is required.")
+
+
+class AddKeyDialog(QDialog):
+    def __init__(self, keys_directory, parent=None):
+        super().__init__(parent)
+        self.keys_directory = keys_directory
+        self.setWindowTitle("Add New Key")
+
+        # Dialog layout
+        layout = QVBoxLayout()
+
+        # Key Name input
+        self.name_label = QLabel("Enter the Key Name:")
+        self.name_input = QLineEdit()
+        layout.addWidget(self.name_label)
+        layout.addWidget(self.name_input)
+
+        # Key Value input
+        self.key_label = QLabel("Enter the Key Value:")
+        self.key_input = QLineEdit()
+        layout.addWidget(self.key_label)
+        layout.addWidget(self.key_input)
+
+        # Save button
+        self.save_button = QPushButton("Save")
+        self.save_button.clicked.connect(self.save_key)
+        layout.addWidget(self.save_button)
+
+        self.setLayout(layout)
+
+    def save_key(self):
+        key_name = self.name_input.text().strip()
+        key_value = self.key_input.text().strip()
+
+        if not key_name or not key_value:
+            QMessageBox.warning(self, "Input Error", "Both key name and key value are required.")
+            return
+
+        # Create the filename
+        file_name = f"{key_name}.keys"
+        file_path = os.path.join(self.keys_directory, file_name)
+
+        # Construct the content of the file
+        api_key_name = f"{key_name}_key"
+        content = f"[API_Key]\n{api_key_name} = {key_value}\n"
+
+        try:
+            # Write the content to the new .keys file
+            with open(file_path, 'w') as key_file:
+                key_file.write(content)
+
+            # Show success message
+            QMessageBox.information(self, "Success", f"New key file '{file_name}' created successfully.")
+
+            # Close the dialog
+            self.accept()
+
+        except Exception as e:
+            QMessageBox.warning(self, "File Error", f"Failed to create the key file: {file_name}\nError: {str(e)}")
+
+
+class RemoveKeyDialog(QDialog):
+    def __init__(self, keys_directory, parent=None):
+        super().__init__(parent)
+        self.keys_directory = keys_directory
+        self.setWindowTitle("Remove Key")
+
+        # Dialog layout
+        layout = QVBoxLayout()
+
+        # Combo box to list all the key files
+        self.combo_box = QComboBox()
+        self.load_key_names()
+        layout.addWidget(QLabel("Select a key to remove:"))
+        layout.addWidget(self.combo_box)
+
+        # Remove button
+        self.remove_button = QPushButton("Remove")
+        self.remove_button.clicked.connect(self.remove_key)
+        layout.addWidget(self.remove_button)
+
+        self.setLayout(layout)
+
+    def load_key_names(self):
+        # Get all .keys files from the 'Keys' directory
+        keys_files = [f for f in os.listdir(self.keys_directory) if f.endswith('.keys') and f != 'template.keys']
+        all_key_names = [os.path.splitext(f)[0] for f in keys_files]
+        self.combo_box.addItems(all_key_names)
+
+    def remove_key(self):
+        selected_key_name = self.combo_box.currentText()
+
+        if not selected_key_name:
+            QMessageBox.warning(self, "Selection Error", "Please select a key to remove.")
+            return
+
+        # Confirm deletion
+        confirm = QMessageBox.question(self, "Confirm Delete",
+            f"Are you sure you want to remove the key '{selected_key_name}'?",
+            QMessageBox.Yes | QMessageBox.No)
+
+        if confirm == QMessageBox.Yes:
+            file_path = os.path.join(self.keys_directory, f"{selected_key_name}.keys")
+            try:
+                # Remove the key file
+                os.remove(file_path)
+
+                # Show success message
+                QMessageBox.information(self, "Success", f"Key file '{selected_key_name}' removed successfully.")
+
+                # Close the dialog and return success
+                self.accept()
+
+            except Exception as e:
+                QMessageBox.warning(self, "File Error", f"Failed to remove the key file: {file_path}\nError: {str(e)}")

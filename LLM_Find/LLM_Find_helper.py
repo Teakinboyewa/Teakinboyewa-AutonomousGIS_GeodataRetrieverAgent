@@ -4,6 +4,7 @@ import traceback
 # import openai
 from collections import deque
 from openai import OpenAI
+from datetime import datetime # NEW CHANGE
 
 import configparser
 
@@ -18,15 +19,25 @@ import pandas as pd
 import geopandas as gpd
 from pyvis.network import Network
 
+##>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # Get the directory of the current script
 current_script_dir = os.path.dirname(os.path.abspath(__file__))
 # Add the directory to sys.path
 if current_script_dir not in sys.path:
     sys.path.append(current_script_dir)
+import LLM_Find_Constants as constants
+import handbook
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
+class CaseSensitiveConfigParser(configparser.ConfigParser):   # NEW CHANGE
+    def optionxform(self, optionstr): # NEW CHANGE
+        return optionstr  # Override to preserve case sensitivity # NEW CHANGE
+
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 def load_config():
     config = configparser.ConfigParser()
-    config_path = os.path.join(current_script_dir, 'config.ini')
+    # config = CaseSensitiveConfigParser() # NEW CHANGE
+    config_path = os.path.join(current_script_dir, 'openai_key_config.ini')
     config.read(config_path)
     return config
 
@@ -36,23 +47,24 @@ config = load_config()
 # use your KEY.
 OpenAI_key = config.get('API_Key', 'OpenAI_key')
 client = OpenAI(api_key=OpenAI_key)
-
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 def load_OpenAI_key():
     config = load_config()  # Re-read the configuration file
     OpenAI_key = config.get('API_Key', 'OpenAI_key')
     return OpenAI_key
 
-import LLM_Find_Constants as constants
+
 
 
 def create_select_prompt(task):
     select_requirement_str = '\n'.join([f"{idx + 1}. {line}" for idx, line in enumerate(constants.select_requirements)])
-
+    handbook_files = handbook.collect_handbook_files() # NEW CHANGE
+    descriptions_str, data_source_dict = handbook.assemble_handbook_description(handbook_files) #NEW CHANGE
     prompt = f"Your role: {constants.select_role} \n" + \
              f"Your mission: {constants.select_task_prefix}: " + f"{task}\n\n" + \
              f"Requirements: \n{select_requirement_str} \n\n" + \
-             f"Data sources:{constants.data_sources} \n" + \
+             f"Data sources:{descriptions_str} \n" + \
              f'Your reply example: {constants.selection_reply_example}'
 
     # print(prompt)
@@ -75,8 +87,11 @@ def convert_chunks_to_str(chunks):
     return LLM_reply_str
 
 
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 def create_download_prompt(task, saved_fname, selected_data_source, handbook_str):
     # select_requirement_str = '\n'.join([f"{idx + 1}. {line}" for idx, line in enumerate(constants.select_requirements)])
+    current_datetime = datetime.now()  # NEW CHANGE
+    formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M") # NEW CHANGE
 
     prompt = f"Your role: {constants.download_role} \n" + \
              f"Your mission: {constants.download_task_prefix}: " + f"{task}" + "And set the output file to be:" + f"{saved_fname}\n\n" + \
@@ -85,7 +100,7 @@ def create_download_prompt(task, saved_fname, selected_data_source, handbook_str
              f"Technical handbook: \n{handbook_str}"
 
     return prompt
-
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 def get_LLM_reply_LC(
         prompt,
